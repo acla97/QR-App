@@ -4,53 +4,58 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Admin redirect</title>
+<title>Admin dispositivi</title>
 <style>
   *{box-sizing:border-box}
   body{font-family:system-ui,sans-serif;background:#f4f5f7;margin:0;padding:20px;color:#222}
-  .card{max-width:480px;margin:0 auto;background:#fff;border-radius:14px;padding:22px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+  .wrap{max-width:560px;margin:0 auto}
   h1{font-size:1.3rem;margin:0 0 4px}
   p.sub{margin:0 0 18px;color:#666;font-size:.9rem}
-  label{display:block;font-size:.85rem;font-weight:600;margin:14px 0 4px}
-  input{width:100%;padding:11px;border:1px solid #ccd;border-radius:8px;font-size:1rem}
-  button{width:100%;margin-top:16px;padding:12px;border:0;border-radius:8px;background:#1a73e8;color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
-  button.sec{background:#e8eaed;color:#222;margin-top:8px}
+  .card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.08);margin-bottom:14px}
+  .dev-head{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+  .dev-head input{font-weight:600}
+  label{display:block;font-size:.8rem;font-weight:600;margin:10px 0 4px;color:#555}
+  input{width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:1rem}
+  input[readonly]{background:#f4f5f7;color:#555;font-size:.85rem}
+  button{padding:11px 14px;border:0;border-radius:8px;background:#1a73e8;color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
+  button.full{width:100%;margin-top:6px}
+  button.sec{background:#e8eaed;color:#222}
+  button.del{background:#fce8e6;color:#d93025;padding:10px 12px}
   button:disabled{opacity:.5}
-  #st{margin-top:14px;font-size:.9rem;min-height:1.2em}
+  .row{display:flex;gap:8px}
+  #st{margin:10px 0;font-size:.9rem;min-height:1.2em}
   .ok{color:#188038}.err{color:#d93025}
-  details{margin-top:18px;font-size:.85rem;color:#555}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  details{margin-top:6px;font-size:.85rem;color:#555}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 </style>
 </head>
 <body>
-<div class="card">
-  <h1>Link di destinazione</h1>
-  <p class="sub">Cambia dove porta la targhetta NFC / QR.</p>
+<div class="wrap">
+  <h1>Dispositivi</h1>
+  <p class="sub">Ogni dispositivo ha il suo link fisso (da mettere nel sito del produttore) e la sua destinazione.</p>
 
-  <label for="url">URL attuale / nuovo URL</label>
-  <input id="url" type="url" placeholder="https://..." inputmode="url" autocomplete="off">
+  <div id="list"></div>
+  <button id="add" class="sec full">+ Aggiungi dispositivo</button>
 
-  <label for="token">Token GitHub (salvato solo su questo dispositivo)</label>
-  <input id="token" type="password" placeholder="github_pat_..." autocomplete="off">
-
-  <button id="save">Salva</button>
-  <button id="test" class="sec">Prova il link</button>
-  <div id="st"></div>
-
-  <details>
-    <summary>Impostazioni repository</summary>
-    <div class="row">
-      <div><label for="owner">Utente GitHub</label><input id="owner"></div>
-      <div><label for="repo">Repository</label><input id="repo"></div>
-    </div>
-  </details>
+  <div class="card" style="margin-top:14px">
+    <label for="token" style="margin-top:0">Token GitHub (salvato solo su questo dispositivo)</label>
+    <input id="token" type="password" placeholder="github_pat_..." autocomplete="off">
+    <button id="save" class="full">Salva tutto</button>
+    <div id="st"></div>
+    <details>
+      <summary>Impostazioni repository</summary>
+      <div class="grid2">
+        <div><label for="owner">Utente GitHub</label><input id="owner"></div>
+        <div><label for="repo">Repository</label><input id="repo"></div>
+      </div>
+    </details>
+  </div>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
 const st = (msg, cls='') => { $('st').textContent = msg; $('st').className = cls; };
 
-// Rileva utente/repo dall'indirizzo GitHub Pages (utente.github.io/repo/)
 const host = location.hostname;
 const parts = location.pathname.split('/').filter(Boolean);
 let owner = '', repo = '';
@@ -74,40 +79,89 @@ const headers = () => {
 };
 const dec = b64 => decodeURIComponent(escape(atob(b64.replace(/\n/g, ''))));
 const enc = s => btoa(unescape(encodeURIComponent(s)));
+const baseLink = id => new URL('./', location.href).href + '?d=' + id;
+
+// Stato: array ordinato di {id, name, url}
+let devices = [];
+
+function render() {
+  const list = $('list');
+  list.innerHTML = '';
+  devices.forEach((d, i) => {
+    const card = document.createElement('div'); card.className = 'card';
+
+    const head = document.createElement('div'); head.className = 'dev-head';
+    const name = document.createElement('input');
+    name.value = d.name; name.placeholder = 'Nome (es. Bar Roma)';
+    name.oninput = () => d.name = name.value;
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕';
+    del.title = 'Elimina';
+    del.onclick = () => { if (confirm('Eliminare "' + (d.name || 'dispositivo ' + d.id) + '"?')) { devices.splice(i, 1); render(); } };
+    head.append(name, del);
+
+    const l1 = document.createElement('label'); l1.textContent = 'Destinazione (pagina recensioni Google)';
+    const url = document.createElement('input');
+    url.type = 'url'; url.placeholder = 'https://...'; url.value = d.url; url.inputMode = 'url';
+    url.oninput = () => d.url = url.value;
+
+    const l2 = document.createElement('label'); l2.textContent = 'Link fisso da mettere nel dispositivo';
+    const row = document.createElement('div'); row.className = 'row';
+    const link = document.createElement('input'); link.readOnly = true; link.value = baseLink(d.id);
+    const copy = document.createElement('button'); copy.className = 'sec'; copy.textContent = 'Copia';
+    copy.onclick = async () => {
+      try { await navigator.clipboard.writeText(link.value); copy.textContent = 'Copiato ✓'; }
+      catch { link.select(); copy.textContent = 'Seleziona e copia'; }
+      setTimeout(() => copy.textContent = 'Copia', 1500);
+    };
+    const test = document.createElement('button'); test.className = 'sec'; test.textContent = 'Prova';
+    test.onclick = () => /^https?:\/\//i.test(d.url) ? window.open(d.url, '_blank') : st('URL non valido.', 'err');
+    row.append(link, copy, test);
+
+    card.append(head, l1, url, l2, row);
+    list.append(card);
+  });
+}
+
+$('add').onclick = () => {
+  const next = devices.reduce((m, d) => Math.max(m, Number(d.id)), 0) + 1;
+  devices.push({ id: String(next), name: 'Dispositivo ' + next, url: '' });
+  render();
+};
 
 async function load() {
   if (!$('owner').value || !$('repo').value) return;
   try {
     const r = await fetch(api() + '?t=' + Date.now(), { headers: headers(), cache: 'no-store' });
     if (!r.ok) throw new Error(r.status);
-    const j = await r.json();
-    $('url').value = JSON.parse(dec(j.content)).url || '';
+    const cfg = JSON.parse(dec((await r.json()).content));
+    devices = Object.entries(cfg.devices || {})
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([id, v]) => ({ id, name: v.name || 'Dispositivo ' + id, url: v.url || '' }));
+    render();
   } catch (e) {
-    st('Impossibile leggere il link attuale (controlla utente/repo).', 'err');
+    st('Impossibile leggere la configurazione (controlla utente/repo).', 'err');
   }
 }
 
 $('save').onclick = async () => {
-  const url = $('url').value.trim();
-  if (!/^https?:\/\//i.test(url)) return st('Inserisci un URL che inizi con http:// o https://', 'err');
   if (!$('token').value.trim()) return st('Inserisci il token GitHub.', 'err');
+  for (const d of devices) {
+    if (!/^https?:\/\//i.test(d.url.trim())) return st('"' + (d.name || 'Dispositivo ' + d.id) + '": inserisci un URL che inizi con http:// o https://', 'err');
+  }
   $('save').disabled = true; st('Salvataggio…');
   try {
     const g = await fetch(api() + '?t=' + Date.now(), { headers: headers(), cache: 'no-store' });
     if (!g.ok) throw new Error('Lettura fallita (' + g.status + '). Token o repo errati?');
     const sha = (await g.json()).sha;
-    const body = { message: 'Aggiorna URL di destinazione', content: enc(JSON.stringify({ url }, null, 2) + '\n'), sha };
+    const out = { devices: {} };
+    devices.forEach(d => out.devices[d.id] = { name: d.name.trim(), url: d.url.trim() });
+    const body = { message: 'Aggiorna dispositivi', content: enc(JSON.stringify(out, null, 2) + '\n'), sha };
     const p = await fetch(api(), { method: 'PUT', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!p.ok) throw new Error('Scrittura fallita (' + p.status + '). Il token ha il permesso "Contents: Read and write"?');
     lset('token', $('token').value.trim()); lset('owner', $('owner').value.trim()); lset('repo', $('repo').value.trim());
     st('Salvato! Attivo entro circa 1 minuto.', 'ok');
   } catch (e) { st(e.message, 'err'); }
   $('save').disabled = false;
-};
-
-$('test').onclick = () => {
-  const u = $('url').value.trim();
-  if (/^https?:\/\//i.test(u)) window.open(u, '_blank'); else st('URL non valido.', 'err');
 };
 
 load();

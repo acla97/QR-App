@@ -1,33 +1,34 @@
-# Redirect dinamico per NFC / QR
+# Redirect dinamico per NFC / QR (più dispositivi)
 
-Una pagina che reindirizza a un URL che puoi cambiare quando vuoi, senza toccare la targhetta.
+Ogni targhetta ha un link fisso e una destinazione che puoi cambiare quando vuoi, senza toccare la targhetta.
 
-- `index.html` → l'indirizzo fisso da mettere nella targhetta (reindirizza)
-- `admin.html` → pannello per cambiare la destinazione
-- `config.json` → contiene l'URL attuale
+- `index.html` → reindirizza in base al dispositivo (`?d=1`, `?d=2`, ...)
+- `admin.html` → pannello per gestire dispositivi e destinazioni
+- `config.json` → elenco dispositivi e URL attuali
 
-## Installazione (5 minuti)
+## Installazione
 
-1. Crea un repository **pubblico** su GitHub (es. `link`) e carica questi 4 file.
-2. Vai su **Settings → Pages**, scegli *Deploy from a branch*, branch `main`, cartella `/ (root)`, poi **Save**.
-3. Dopo un minuto il sito è online su `https://TUOUTENTE.github.io/link/`.
-   **Questo è l'URL da inserire nel sito del produttore della targhetta.**
+1. Carica i 4 file nel repository `QR-App` (pubblico).
+2. **Settings → Pages**: *Deploy from a branch*, branch `main`, cartella `/ (root)`, **Save**.
+3. Il sito è su `https://acla97.github.io/QR-App/`.
 
-## Creare il token (una volta sola)
+## Token (una volta sola)
 
 1. GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
-2. *Repository access*: **Only select repositories** → scegli il repo.
-3. *Permissions → Repository permissions → Contents*: **Read and write**.
+2. *Repository access*: **Only select repositories** → `QR-App`.
+3. *Repository permissions → Contents*: **Read and write**.
 4. Copia il token (`github_pat_...`).
 
-## Cambiare il link
+## Uso
 
-1. Apri `https://TUOUTENTE.github.io/link/admin.html` (anche da telefono).
-2. Incolla il token la prima volta (resta salvato solo sul tuo dispositivo).
-3. Scrivi il nuovo URL e premi **Salva**. Attivo in circa 1 minuto.
+1. Apri `https://acla97.github.io/QR-App/admin.html`.
+2. Incolla il token la prima volta (resta solo sul tuo dispositivo).
+3. Per ogni attività: dai un nome, incolla la pagina recensioni Google, premi **Salva tutto**.
+4. Copia il **link fisso** del dispositivo (es. `https://acla97.github.io/QR-App/?d=1`) e inseriscilo nel sito del produttore di quella targhetta.
+5. Per cambiare destinazione in futuro: stesso pannello, modifica l'URL e salva (attivo in circa 1 minuto).
 
 ## Note
 
-- Non condividere il token: chi lo ha può modificare il repository.
-- Il repo è pubblico, quindi anche l'URL di destinazione è leggibile da chiunque (è comunque visibile a chi scansiona).
-- Nessuna statistica sulle scansioni (GitHub Pages è statico).
+- Non condividere il token.
+- Il repo è pubblico: gli URL di destinazione sono leggibili da chiunque.
+- Nessuna statistica sulle scansioni.
