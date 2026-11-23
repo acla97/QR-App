@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reindirizzamento…</title>
+<style>
+  body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;color:#555;background:#fafafa}
+</style>
+</head>
+<body>
+<p id="m">Reindirizzamento in corso…</p>
+<script>
+(async () => {
+  try {
+    const r = await fetch('config.json?t=' + Date.now(), { cache: 'no-store' });
+    const { url } = await r.json();
+    if (!/^https?:\/\//i.test(url)) throw new Error('URL non valido');
+    location.replace(url);
+  } catch (e) {
+    document.getElementById('m').textContent = 'Link non disponibile al momento.';
+  }
+})();
+</script>
+</body>
+</html>
