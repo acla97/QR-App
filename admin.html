@@ -33,6 +33,8 @@
   input[type=color]{width:64px;height:40px;padding:2px;cursor:pointer}
   .card details{margin-top:12px;border-top:1px solid #eef0f3;padding-top:10px}
   .card summary{cursor:pointer;font-weight:600;color:#333}
+  .savebtn{margin-top:14px}
+  .msgs{margin-top:2px}
   #report{margin-top:6px}
   .rep-title{font-weight:700;font-size:.9rem;margin:6px 0}
   .chg{border:1px solid #e1e5ea;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fafbfc}
@@ -46,8 +48,7 @@
   .live{font-size:.85rem;margin-top:8px}
   .live.ok{color:#188038;font-weight:600}
   .live.err{color:#b06000}
-  .live button{margin-top:8px;padding:8px 12px;font-size:.9rem}
-</style>
+  .live button{margin-top:8px;padding:8px 12px;font-size:.9rem}</style>
 </head>
 <body>
 <div class="wrap">
@@ -60,9 +61,11 @@
   <div class="card" style="margin-top:14px">
     <label for="token" style="margin-top:0">Token GitHub (salvato solo su questo dispositivo)</label>
     <input id="token" type="password" placeholder="github_pat_..." autocomplete="off">
-    <button id="save" class="full">Salva e verifica</button>
-    <div id="st" role="status" aria-live="polite"></div>
-    <div id="report" aria-live="polite"></div>
+    <div class="hint">Il pulsante <b>Salva e verifica</b> si trova dentro ogni dispositivo, sopra "Pagina di cortesia".</div>
+    <div id="msgHome">
+      <div id="st" role="status" aria-live="polite"></div>
+      <div id="report" aria-live="polite"></div>
+    </div>
     <details>
       <summary>Impostazioni repository</summary>
       <div class="grid2">
@@ -75,7 +78,10 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const st = (msg, cls='') => { $('st').textContent = msg; $('st').className = cls; };
+// Dove mostrare messaggi e verifica: la scheda del dispositivo su cui hai premuto Salva
+let ui = { st: $('st'), rep: $('report') };
+let liveEl = null;
+const st = (msg, cls='') => { ui.st.textContent = msg; ui.st.className = cls; };
 
 const host = location.hostname;
 const parts = location.pathname.split('/').filter(Boolean);
@@ -126,6 +132,8 @@ const mk = (id, name, url, x = {}) => ({
 
 function render() {
   const list = $('list');
+  // rimetti i messaggi al loro posto prima di ricostruire le schede
+  $('msgHome').append($('st'), $('report'));
   list.innerHTML = '';
   devices.forEach((d, i) => {
     const card = document.createElement('div'); card.className = 'card';
@@ -191,7 +199,16 @@ function render() {
     pv.textContent = 'Per vedere l\'anteprima salva, attendi circa 1 minuto e usa il link fisso qui sopra. Il nome dell\'attività è quello in alto.';
     det.append(sm, cbRow, lm, msg, lg, logo, lc, col, pv);
 
-    card.append(head, l1, url, l3, code, hint, l2, row, det);
+    // Pulsante di salvataggio dentro ogni dispositivo, prima della pagina di cortesia
+    const sv = document.createElement('button'); sv.className = 'full savebtn'; sv.textContent = 'Salva e verifica';
+    const msgs = document.createElement('div'); msgs.className = 'msgs';
+    sv.onclick = () => {
+      msgs.append($('st'), $('report'));
+      st(''); $('report').replaceChildren();
+      saveAll();
+    };
+
+    card.append(head, l1, url, l3, code, hint, l2, row, sv, msgs, det);
     list.append(card);
   });
 }
@@ -242,7 +259,7 @@ function line(label, value, cls) {
 
 function showReport(changes) {
   lastChanges = changes;
-  const box = $('report'); box.replaceChildren();
+  const box = ui.rep; box.replaceChildren();
   const head = document.createElement('div'); head.className = 'rep-title';
   head.textContent = changes.length ? 'Cosa è cambiato' : 'Nessun link è cambiato: sono state salvate solo le altre impostazioni.';
   box.append(head);
@@ -258,7 +275,7 @@ function showReport(changes) {
     box.append(el);
   });
   if (changes.length) {
-    const g = document.createElement('div'); g.id = 'live'; g.className = 'live';
+    const g = document.createElement('div'); g.className = 'live'; liveEl = g;
     box.append(g);
     verify();
   }
@@ -266,7 +283,7 @@ function showReport(changes) {
 
 // Controlla sul sito pubblicato (GitHub Pages) che config.json contenga davvero i nuovi link
 async function verify() {
-  const my = ++pollId, list = lastChanges, g = $('live');
+  const my = ++pollId, list = lastChanges, g = liveEl;
   if (!g || !list.length) return;
   list.forEach(c => { c.ok = false; c.el.textContent = 'Verifica online in corso…'; c.el.className = 'chg-s'; });
   g.className = 'live';
@@ -304,8 +321,9 @@ async function verify() {
   g.append(document.createElement('br'), b);
 }
 
-$('save').onclick = async () => {
-  if (!$('token').value.trim()) return st('Inserisci il token GitHub.', 'err');
+const lockSave = on => document.querySelectorAll('.savebtn').forEach(b => { b.disabled = on; });
+async function saveAll() {
+  if (!$('token').value.trim()) return st('Inserisci il token GitHub (campo in fondo alla pagina).', 'err');
   const seen = new Set();
   for (const d of devices) {
     const n = d.name || d.id || 'senza nome';
@@ -317,7 +335,7 @@ $('save').onclick = async () => {
   }
   const changes = diff();
   pollId++; $('report').replaceChildren();
-  $('save').disabled = true; st('Salvataggio…');
+  lockSave(true); st('Salvataggio…');
   try {
     const g = await fetch(api() + '?t=' + Date.now(), { headers: headers(), cache: 'no-store' });
     if (!g.ok) throw new Error('Lettura fallita (' + g.status + '). Token o repo errati?');
@@ -337,8 +355,8 @@ $('save').onclick = async () => {
     st('Salvato su GitHub ✓', 'ok');
     showReport(changes);
   } catch (e) { st(e.message, 'err'); }
-  $('save').disabled = false;
-};
+  lockSave(false);
+}
 
 load();
 </script>
