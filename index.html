@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
 <title>Reindirizzamento…</title>
 <style>
   body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;color:#555;background:#fafafa;text-align:center;padding:20px}
@@ -20,6 +21,19 @@
     const cfg = await r.json();
     const dev = cfg.devices && cfg.devices[id];
     if (!dev || !/^https?:\/\//i.test(dev.url)) throw new Error('Link non trovato');
+
+    // Statistiche (facoltative): conta la scansione su GoatCounter, senza cookie e senza dati personali.
+    // Attende al massimo 0,8 secondi, poi reindirizza comunque.
+    const code = String(cfg.stats || '').trim().toLowerCase();
+    if (/^[a-z0-9-]{2,}$/.test(code)) {
+      await new Promise(done => {
+        const px = new Image();
+        px.onload = px.onerror = done;
+        px.src = 'https://' + code + '.goatcounter.com/count?p=' + encodeURIComponent('/d/' + id) +
+                 '&t=' + encodeURIComponent(dev.name || id);
+        setTimeout(done, 800);
+      });
+    }
     location.replace(dev.url);
   } catch (e) {
     m.textContent = 'Link non disponibile al momento.';

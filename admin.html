@@ -28,9 +28,6 @@
   .ok{color:#188038}.err{color:#d93025}
   details{margin-top:6px;font-size:.85rem;color:#555}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .check{display:flex;gap:8px;align-items:center;font-weight:500;color:#222;font-size:.9rem;margin:12px 0 4px}
-  .check input{width:auto}
-  input[type=color]{width:64px;height:40px;padding:2px;cursor:pointer}
   .card details{margin-top:12px;border-top:1px solid #eef0f3;padding-top:10px}
   .card summary{cursor:pointer;font-weight:600;color:#333}
   .savebtn{margin-top:14px}
@@ -61,7 +58,10 @@
   <div class="card" style="margin-top:14px">
     <label for="token" style="margin-top:0">Token GitHub (salvato solo su questo dispositivo)</label>
     <input id="token" type="password" placeholder="github_pat_..." autocomplete="off">
-    <div class="hint">Il pulsante <b>Salva e verifica</b> si trova dentro ogni dispositivo, sopra "Pagina di cortesia".</div>
+    <div class="hint">Il pulsante <b>Salva e verifica</b> si trova dentro ogni dispositivo.</div>
+    <label for="stats">Statistiche scansioni (GoatCounter, facoltativo)</label>
+    <input id="stats" placeholder="il tuo codice, es. mio-bar" autocapitalize="none" autocomplete="off">
+    <div class="hint">Si salva insieme ai dispositivi. Lascia vuoto per non contare le scansioni. <a id="statsLink" target="_blank" rel="noopener" hidden>Apri le statistiche</a></div>
     <div id="msgHome">
       <div id="st" role="status" aria-live="polite"></div>
       <div id="report" aria-live="polite"></div>
@@ -109,6 +109,14 @@ const enc = s => btoa(unescape(encodeURIComponent(s)));
 const baseLink = id => new URL('./', location.href).href + '?d=' + id;
 // Codice del link: solo lettere minuscole, numeri e trattini
 const slug = s => s.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+// Codice GoatCounter per le statistiche
+const statsCode = () => $('stats').value.trim().toLowerCase();
+const updStats = () => {
+  const c = statsCode(), a = $('statsLink');
+  a.hidden = !/^[a-z0-9-]{2,}$/.test(c);
+  a.href = 'https://' + c + '.goatcounter.com';
+};
+$('stats').oninput = updStats;
 
 // Stato: array ordinato di {uid, id (codice nel link), name, url}
 let uidc = 0;
@@ -122,13 +130,7 @@ const snap = list => {
   list.forEach(d => { o[d.id] = { name: (d.name || d.id).trim(), url: d.url.trim() }; });
   return o;
 };
-const mk = (id, name, url, x = {}) => ({
-  uid: ++uidc, id, name, url,
-  courtesy: x.courtesy !== false,
-  message: x.message || '',
-  logo: x.logo || '',
-  color: /^#[0-9a-f]{6}$/i.test(x.color || '') ? x.color : '#1a73e8'
-});
+const mk = (id, name, url) => ({ uid: ++uidc, id, name, url });
 
 function render() {
   const list = $('list');
@@ -151,6 +153,34 @@ function render() {
     const url = document.createElement('input');
     url.type = 'url'; url.placeholder = 'https://...'; url.value = d.url; url.inputMode = 'url';
     url.oninput = () => d.url = url.value;
+
+    // Generatore del link recensioni a partire dal Place ID
+    const gen = document.createElement('details');
+    const gsum = document.createElement('summary'); gsum.textContent = 'Non hai il link? Crealo dal Place ID';
+    const gl = document.createElement('label'); gl.textContent = "Place ID dell'attività (di solito inizia con ChIJ)";
+    const pid = document.createElement('input'); pid.placeholder = 'ChIJ…'; pid.autocapitalize = 'none'; pid.autocomplete = 'off';
+    const gb = document.createElement('button'); gb.className = 'sec full'; gb.textContent = 'Genera link';
+    const gh = document.createElement('div'); gh.className = 'hint';
+    const gf = document.createElement('div'); gf.className = 'hint';
+    const finder = document.createElement('a');
+    finder.href = 'https://www.google.com/search?q=Google+Place+ID+finder'; finder.target = '_blank'; finder.rel = 'noopener';
+    finder.textContent = 'Come trovo il Place ID?';
+    gf.append(finder);
+    gb.onclick = () => {
+      let v = pid.value.trim();
+      const m = v.match(/placeid=([A-Za-z0-9_-]+)/i);
+      if (m) v = m[1];
+      if (!/^[A-Za-z0-9_-]{15,}$/.test(v)) {
+        gh.textContent = 'Il Place ID non sembra valido: di solito inizia con ChIJ e non contiene spazi.';
+        gh.className = 'hint err';
+        return;
+      }
+      const u = 'https://search.google.com/local/writereview?placeid=' + v;
+      d.url = u; url.value = u;
+      gh.textContent = 'Link inserito in Destinazione. Premi Prova per controllarlo, poi Salva e verifica.';
+      gh.className = 'hint ok';
+    };
+    gen.append(gsum, gl, pid, gb, gh, gf);
 
     const l3 = document.createElement('label'); l3.textContent = 'Codice del link (es. bar-roma)';
     const code = document.createElement('input');
@@ -177,29 +207,7 @@ function render() {
     test.onclick = () => /^https?:\/\//i.test(d.url) ? window.open(d.url, '_blank') : st('URL non valido.', 'err');
     row.append(link, copy, test);
 
-    // Pagina di cortesia
-    const det = document.createElement('details');
-    const sm = document.createElement('summary'); sm.textContent = 'Pagina di cortesia';
-    const cbRow = document.createElement('label'); cbRow.className = 'check';
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = d.courtesy;
-    cb.onchange = () => d.courtesy = cb.checked;
-    cbRow.append(cb, document.createTextNode('Mostra una pagina di benvenuto prima delle recensioni'));
-    const lm = document.createElement('label'); lm.textContent = 'Messaggio (facoltativo)';
-    const msg = document.createElement('input');
-    msg.value = d.message; msg.placeholder = 'Ci fa piacere sapere cosa ne pensi. Ci vuole solo un minuto.';
-    msg.oninput = () => d.message = msg.value;
-    const lg = document.createElement('label'); lg.textContent = 'Logo (indirizzo https di un\'immagine, facoltativo)';
-    const logo = document.createElement('input');
-    logo.type = 'url'; logo.inputMode = 'url'; logo.placeholder = 'https://...'; logo.value = d.logo;
-    logo.oninput = () => d.logo = logo.value;
-    const lc = document.createElement('label'); lc.textContent = 'Colore';
-    const col = document.createElement('input'); col.type = 'color'; col.value = d.color;
-    col.oninput = () => d.color = col.value;
-    const pv = document.createElement('div'); pv.className = 'hint';
-    pv.textContent = 'Per vedere l\'anteprima salva, attendi circa 1 minuto e usa il link fisso qui sopra. Il nome dell\'attività è quello in alto.';
-    det.append(sm, cbRow, lm, msg, lg, logo, lc, col, pv);
-
-    // Pulsante di salvataggio dentro ogni dispositivo, prima della pagina di cortesia
+    // Pulsante di salvataggio dentro ogni dispositivo
     const sv = document.createElement('button'); sv.className = 'full savebtn'; sv.textContent = 'Salva e verifica';
     const msgs = document.createElement('div'); msgs.className = 'msgs';
     sv.onclick = () => {
@@ -208,7 +216,7 @@ function render() {
       saveAll();
     };
 
-    card.append(head, l1, url, l3, code, hint, l2, row, sv, msgs, det);
+    card.append(head, l1, url, gen, l3, code, hint, l2, row, sv, msgs);
     list.append(card);
   });
 }
@@ -230,6 +238,8 @@ async function load() {
       .sort((a, b) => a[0].localeCompare(b[0], 'it', { numeric: true }))
       .map(([id, v]) => mk(id, v.name || id, v.url || '', v));
     saved = snap(devices);
+    $('stats').value = cfg.stats || '';
+    updStats();
     render();
   } catch (e) {
     st('Impossibile leggere la configurazione (controlla utente/repo).', 'err');
@@ -261,7 +271,7 @@ function showReport(changes) {
   lastChanges = changes;
   const box = ui.rep; box.replaceChildren();
   const head = document.createElement('div'); head.className = 'rep-title';
-  head.textContent = changes.length ? 'Cosa è cambiato' : 'Nessun link è cambiato: sono state salvate solo le altre impostazioni.';
+  head.textContent = changes.length ? 'Cosa è cambiato' : 'Nessun link è cambiato.';
   box.append(head);
   changes.forEach(c => {
     const el = document.createElement('div'); el.className = 'chg';
@@ -331,8 +341,9 @@ async function saveAll() {
     if (seen.has(d.id)) return st('Il codice "' + d.id + '" è usato da più dispositivi: deve essere unico.', 'err');
     seen.add(d.id);
     if (!/^https?:\/\//i.test(d.url.trim())) return st('"' + n + '": inserisci un URL che inizi con http:// o https://', 'err');
-    if (d.logo.trim() && !/^https:\/\//i.test(d.logo.trim())) return st('"' + n + '": il logo deve essere un indirizzo che inizia con https://', 'err');
   }
+  const sc = statsCode();
+  if (sc && !/^[a-z0-9-]{2,}$/.test(sc)) return st('Codice statistiche non valido: solo lettere, numeri e trattini.', 'err');
   const changes = diff();
   pollId++; $('report').replaceChildren();
   lockSave(true); st('Salvataggio…');
@@ -340,12 +351,11 @@ async function saveAll() {
     const g = await fetch(api() + '?t=' + Date.now(), { headers: headers(), cache: 'no-store' });
     if (!g.ok) throw new Error('Lettura fallita (' + g.status + '). Token o repo errati?');
     const sha = (await g.json()).sha;
-    const out = { devices: {} };
+    const out = {};
+    if (sc) out.stats = sc;
+    out.devices = {};
     devices.forEach(d => {
-      const o = { name: (d.name || d.id).trim(), url: d.url.trim(), courtesy: d.courtesy, color: d.color };
-      if (d.message.trim()) o.message = d.message.trim();
-      if (d.logo.trim()) o.logo = d.logo.trim();
-      out.devices[d.id] = o;
+      out.devices[d.id] = { name: (d.name || d.id).trim(), url: d.url.trim() };
     });
     const body = { message: 'Aggiorna dispositivi', content: enc(JSON.stringify(out, null, 2) + '\n'), sha };
     const p = await fetch(api(), { method: 'PUT', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
