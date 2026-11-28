@@ -23,9 +23,9 @@ Ogni targhetta ha un link fisso e una destinazione che puoi cambiare quando vuoi
 
 1. Apri `https://acla97.github.io/QR-App/admin.html`.
 2. Incolla il token la prima volta (resta solo sul tuo dispositivo).
-3. Per ogni attività: dai un nome, incolla la pagina recensioni Google, premi **Salva tutto**.
+3. Per ogni attività: dai un nome, incolla la pagina recensioni Google, premi **Salva tutto**. Puoi anche personalizzare il **codice del link** (per esempio `bar-roma` al posto di `1`): il link diventa `https://acla97.github.io/QR-App/?d=bar-roma`. Se cambi un codice già usato in una targhetta, il vecchio link smette di funzionare.
 4. Copia il **link fisso** del dispositivo (es. `https://acla97.github.io/QR-App/?d=1`) e inseriscilo nel sito del produttore di quella targhetta.
-5. Per cambiare destinazione in futuro: stesso pannello, modifica l'URL e salva (attivo in circa 1 minuto).
+5. Per cambiare destinazione in futuro: stesso pannello, modifica l'URL e premi **Salva e verifica**. Sotto il pulsante compare il link **Prima** e quello **Ora**, poi il pannello controlla il sito pubblicato e mostra **Online ✓** quando il nuovo link è davvero attivo (di solito circa 1 minuto).
 
 ## Note
 

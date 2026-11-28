@@ -15,6 +15,7 @@
   .dev-head{display:flex;gap:8px;align-items:center;margin-bottom:6px}
   .dev-head input{font-weight:600}
   label{display:block;font-size:.8rem;font-weight:600;margin:10px 0 4px;color:#555}
+  .hint{font-size:.78rem;color:#777;margin-top:4px}
   input{width:100%;padding:10px;border:1px solid #ccd;border-radius:8px;font-size:1rem}
   input[readonly]{background:#f4f5f7;color:#555;font-size:.85rem}
   button{padding:11px 14px;border:0;border-radius:8px;background:#1a73e8;color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
@@ -27,6 +28,25 @@
   .ok{color:#188038}.err{color:#d93025}
   details{margin-top:6px;font-size:.85rem;color:#555}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .check{display:flex;gap:8px;align-items:center;font-weight:500;color:#222;font-size:.9rem;margin:12px 0 4px}
+  .check input{width:auto}
+  input[type=color]{width:64px;height:40px;padding:2px;cursor:pointer}
+  .card details{margin-top:12px;border-top:1px solid #eef0f3;padding-top:10px}
+  .card summary{cursor:pointer;font-weight:600;color:#333}
+  #report{margin-top:6px}
+  .rep-title{font-weight:700;font-size:.9rem;margin:6px 0}
+  .chg{border:1px solid #e1e5ea;border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fafbfc}
+  .chg-t{font-weight:600;font-size:.9rem;margin-bottom:4px}
+  .ln{font-size:.8rem;word-break:break-all;margin:2px 0}
+  .ln b{display:inline-block;min-width:3.4em}
+  .ln.old{color:#b3261e}
+  .ln.new{color:#188038}
+  .chg-s{font-size:.8rem;margin-top:6px;color:#8a6d00}
+  .chg-s.ok{color:#188038;font-weight:600}
+  .live{font-size:.85rem;margin-top:8px}
+  .live.ok{color:#188038;font-weight:600}
+  .live.err{color:#b06000}
+  .live button{margin-top:8px;padding:8px 12px;font-size:.9rem}
 </style>
 </head>
 <body>
@@ -40,8 +60,9 @@
   <div class="card" style="margin-top:14px">
     <label for="token" style="margin-top:0">Token GitHub (salvato solo su questo dispositivo)</label>
     <input id="token" type="password" placeholder="github_pat_..." autocomplete="off">
-    <button id="save" class="full">Salva tutto</button>
-    <div id="st"></div>
+    <button id="save" class="full">Salva e verifica</button>
+    <div id="st" role="status" aria-live="polite"></div>
+    <div id="report" aria-live="polite"></div>
     <details>
       <summary>Impostazioni repository</summary>
       <div class="grid2">
@@ -80,9 +101,28 @@ const headers = () => {
 const dec = b64 => decodeURIComponent(escape(atob(b64.replace(/\n/g, ''))));
 const enc = s => btoa(unescape(encodeURIComponent(s)));
 const baseLink = id => new URL('./', location.href).href + '?d=' + id;
+// Codice del link: solo lettere minuscole, numeri e trattini
+const slug = s => s.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-// Stato: array ordinato di {id, name, url}
+// Stato: array ordinato di {uid, id (codice nel link), name, url}
+let uidc = 0;
 let devices = [];
+// Come sono i link su GitHub adesso (serve per mostrare "prima" e "ora")
+let saved = {};
+let lastChanges = [];
+let pollId = 0;
+const snap = list => {
+  const o = {};
+  list.forEach(d => { o[d.id] = { name: (d.name || d.id).trim(), url: d.url.trim() }; });
+  return o;
+};
+const mk = (id, name, url, x = {}) => ({
+  uid: ++uidc, id, name, url,
+  courtesy: x.courtesy !== false,
+  message: x.message || '',
+  logo: x.logo || '',
+  color: /^#[0-9a-f]{6}$/i.test(x.color || '') ? x.color : '#1a73e8'
+});
 
 function render() {
   const list = $('list');
@@ -96,7 +136,7 @@ function render() {
     name.oninput = () => d.name = name.value;
     const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕';
     del.title = 'Elimina';
-    del.onclick = () => { if (confirm('Eliminare "' + (d.name || 'dispositivo ' + d.id) + '"?')) { devices.splice(i, 1); render(); } };
+    del.onclick = () => { if (confirm('Eliminare "' + (d.name || d.id) + '"?')) { devices.splice(i, 1); render(); } };
     head.append(name, del);
 
     const l1 = document.createElement('label'); l1.textContent = 'Destinazione (pagina recensioni Google)';
@@ -104,9 +144,21 @@ function render() {
     url.type = 'url'; url.placeholder = 'https://...'; url.value = d.url; url.inputMode = 'url';
     url.oninput = () => d.url = url.value;
 
+    const l3 = document.createElement('label'); l3.textContent = 'Codice del link (es. bar-roma)';
+    const code = document.createElement('input');
+    code.value = d.id; code.placeholder = 'bar-roma'; code.autocapitalize = 'none'; code.autocomplete = 'off';
+    const hint = document.createElement('div'); hint.className = 'hint';
+    hint.textContent = 'Solo lettere, numeri e trattini. Se lo cambi dopo aver configurato la targhetta, il vecchio link smette di funzionare.';
+
     const l2 = document.createElement('label'); l2.textContent = 'Link fisso da mettere nel dispositivo';
     const row = document.createElement('div'); row.className = 'row';
     const link = document.createElement('input'); link.readOnly = true; link.value = baseLink(d.id);
+    code.oninput = () => {
+      const v = slug(code.value);
+      if (code.value !== v) code.value = v;
+      d.id = v;
+      link.value = baseLink(v);
+    };
     const copy = document.createElement('button'); copy.className = 'sec'; copy.textContent = 'Copia';
     copy.onclick = async () => {
       try { await navigator.clipboard.writeText(link.value); copy.textContent = 'Copiato ✓'; }
@@ -117,14 +169,37 @@ function render() {
     test.onclick = () => /^https?:\/\//i.test(d.url) ? window.open(d.url, '_blank') : st('URL non valido.', 'err');
     row.append(link, copy, test);
 
-    card.append(head, l1, url, l2, row);
+    // Pagina di cortesia
+    const det = document.createElement('details');
+    const sm = document.createElement('summary'); sm.textContent = 'Pagina di cortesia';
+    const cbRow = document.createElement('label'); cbRow.className = 'check';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = d.courtesy;
+    cb.onchange = () => d.courtesy = cb.checked;
+    cbRow.append(cb, document.createTextNode('Mostra una pagina di benvenuto prima delle recensioni'));
+    const lm = document.createElement('label'); lm.textContent = 'Messaggio (facoltativo)';
+    const msg = document.createElement('input');
+    msg.value = d.message; msg.placeholder = 'Ci fa piacere sapere cosa ne pensi. Ci vuole solo un minuto.';
+    msg.oninput = () => d.message = msg.value;
+    const lg = document.createElement('label'); lg.textContent = 'Logo (indirizzo https di un\'immagine, facoltativo)';
+    const logo = document.createElement('input');
+    logo.type = 'url'; logo.inputMode = 'url'; logo.placeholder = 'https://...'; logo.value = d.logo;
+    logo.oninput = () => d.logo = logo.value;
+    const lc = document.createElement('label'); lc.textContent = 'Colore';
+    const col = document.createElement('input'); col.type = 'color'; col.value = d.color;
+    col.oninput = () => d.color = col.value;
+    const pv = document.createElement('div'); pv.className = 'hint';
+    pv.textContent = 'Per vedere l\'anteprima salva, attendi circa 1 minuto e usa il link fisso qui sopra. Il nome dell\'attività è quello in alto.';
+    det.append(sm, cbRow, lm, msg, lg, logo, lc, col, pv);
+
+    card.append(head, l1, url, l3, code, hint, l2, row, det);
     list.append(card);
   });
 }
 
 $('add').onclick = () => {
-  const next = devices.reduce((m, d) => Math.max(m, Number(d.id)), 0) + 1;
-  devices.push({ id: String(next), name: 'Dispositivo ' + next, url: '' });
+  const nums = devices.map(d => Number(d.id)).filter(n => Number.isInteger(n));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  devices.push(mk(String(next), 'Dispositivo ' + next, '', {}));
   render();
 };
 
@@ -135,31 +210,132 @@ async function load() {
     if (!r.ok) throw new Error(r.status);
     const cfg = JSON.parse(dec((await r.json()).content));
     devices = Object.entries(cfg.devices || {})
-      .sort((a, b) => Number(a[0]) - Number(b[0]))
-      .map(([id, v]) => ({ id, name: v.name || 'Dispositivo ' + id, url: v.url || '' }));
+      .sort((a, b) => a[0].localeCompare(b[0], 'it', { numeric: true }))
+      .map(([id, v]) => mk(id, v.name || id, v.url || '', v));
+    saved = snap(devices);
     render();
   } catch (e) {
     st('Impossibile leggere la configurazione (controlla utente/repo).', 'err');
   }
 }
 
+// Confronta i link attuali con quelli salvati su GitHub
+function diff() {
+  const now = snap(devices), out = [];
+  for (const id in now) {
+    if (!(id in saved)) out.push({ id, name: now[id].name, kind: 'new', old: '', url: now[id].url });
+    else if (saved[id].url !== now[id].url) out.push({ id, name: now[id].name, kind: 'url', old: saved[id].url, url: now[id].url });
+  }
+  for (const id in saved) {
+    if (!(id in now)) out.push({ id, name: saved[id].name, kind: 'del', old: saved[id].url, url: '' });
+  }
+  return out;
+}
+
+const KIND = { url: 'link cambiato', new: 'nuovo dispositivo', del: 'dispositivo eliminato' };
+function line(label, value, cls) {
+  const p = document.createElement('div'); p.className = 'ln ' + cls;
+  const b = document.createElement('b'); b.textContent = label;
+  p.append(b, document.createTextNode(' ' + value));
+  return p;
+}
+
+function showReport(changes) {
+  lastChanges = changes;
+  const box = $('report'); box.replaceChildren();
+  const head = document.createElement('div'); head.className = 'rep-title';
+  head.textContent = changes.length ? 'Cosa è cambiato' : 'Nessun link è cambiato: sono state salvate solo le altre impostazioni.';
+  box.append(head);
+  changes.forEach(c => {
+    const el = document.createElement('div'); el.className = 'chg';
+    const t = document.createElement('div'); t.className = 'chg-t';
+    t.textContent = c.name + ' · ' + KIND[c.kind];
+    el.append(t);
+    if (c.kind !== 'new') el.append(line('Prima:', c.old, 'old'));
+    if (c.kind !== 'del') el.append(line('Ora:', c.url, 'new'));
+    const s = document.createElement('div'); s.className = 'chg-s'; s.textContent = 'Verifica online in corso…';
+    c.el = s; el.append(s);
+    box.append(el);
+  });
+  if (changes.length) {
+    const g = document.createElement('div'); g.id = 'live'; g.className = 'live';
+    box.append(g);
+    verify();
+  }
+}
+
+// Controlla sul sito pubblicato (GitHub Pages) che config.json contenga davvero i nuovi link
+async function verify() {
+  const my = ++pollId, list = lastChanges, g = $('live');
+  if (!g || !list.length) return;
+  list.forEach(c => { c.ok = false; c.el.textContent = 'Verifica online in corso…'; c.el.className = 'chg-s'; });
+  g.className = 'live';
+  g.textContent = 'Controllo che il sito pubblicato abbia i nuovi link (può servire circa 1 minuto)…';
+  const o = $('owner').value.trim(), rp = $('repo').value.trim();
+  const base = 'https://' + o + '.github.io/' + (rp === o + '.github.io' ? '' : rp + '/') + 'config.json';
+  const t0 = Date.now();
+  while (Date.now() - t0 < 150000) {
+    if (my !== pollId) return;
+    try {
+      const res = await fetch(base + '?t=' + Date.now(), { cache: 'no-store' });
+      if (res.ok) {
+        const devs = (await res.json()).devices || {};
+        if (my !== pollId) return;
+        list.forEach(c => {
+          const live = devs[c.id];
+          c.ok = c.kind === 'del' ? !live : (!!live && live.url === c.url);
+          c.el.textContent = c.ok ? (c.kind === 'del' ? 'Online ✓ rimosso' : 'Online ✓ il link ora porta qui') : 'Non ancora online…';
+          c.el.className = 'chg-s' + (c.ok ? ' ok' : '');
+        });
+        if (list.every(c => c.ok)) {
+          g.className = 'live ok';
+          g.textContent = 'Verificato: i nuovi link sono online.';
+          return;
+        }
+      }
+    } catch (e) {}
+    await new Promise(done => setTimeout(done, 5000));
+  }
+  if (my !== pollId) return;
+  g.className = 'live err';
+  g.textContent = 'Il sito non mostra ancora il nuovo link. Di solito basta qualche minuto.';
+  const b = document.createElement('button'); b.className = 'sec'; b.textContent = 'Ricontrolla';
+  b.onclick = () => verify();
+  g.append(document.createElement('br'), b);
+}
+
 $('save').onclick = async () => {
   if (!$('token').value.trim()) return st('Inserisci il token GitHub.', 'err');
+  const seen = new Set();
   for (const d of devices) {
-    if (!/^https?:\/\//i.test(d.url.trim())) return st('"' + (d.name || 'Dispositivo ' + d.id) + '": inserisci un URL che inizi con http:// o https://', 'err');
+    const n = d.name || d.id || 'senza nome';
+    if (!d.id || !/^[a-z0-9][a-z0-9-]*$/.test(d.id)) return st('"' + n + '": il codice del link deve contenere solo lettere minuscole, numeri e trattini.', 'err');
+    if (seen.has(d.id)) return st('Il codice "' + d.id + '" è usato da più dispositivi: deve essere unico.', 'err');
+    seen.add(d.id);
+    if (!/^https?:\/\//i.test(d.url.trim())) return st('"' + n + '": inserisci un URL che inizi con http:// o https://', 'err');
+    if (d.logo.trim() && !/^https:\/\//i.test(d.logo.trim())) return st('"' + n + '": il logo deve essere un indirizzo che inizia con https://', 'err');
   }
+  const changes = diff();
+  pollId++; $('report').replaceChildren();
   $('save').disabled = true; st('Salvataggio…');
   try {
     const g = await fetch(api() + '?t=' + Date.now(), { headers: headers(), cache: 'no-store' });
     if (!g.ok) throw new Error('Lettura fallita (' + g.status + '). Token o repo errati?');
     const sha = (await g.json()).sha;
     const out = { devices: {} };
-    devices.forEach(d => out.devices[d.id] = { name: d.name.trim(), url: d.url.trim() });
+    devices.forEach(d => {
+      const o = { name: (d.name || d.id).trim(), url: d.url.trim(), courtesy: d.courtesy, color: d.color };
+      if (d.message.trim()) o.message = d.message.trim();
+      if (d.logo.trim()) o.logo = d.logo.trim();
+      out.devices[d.id] = o;
+    });
     const body = { message: 'Aggiorna dispositivi', content: enc(JSON.stringify(out, null, 2) + '\n'), sha };
     const p = await fetch(api(), { method: 'PUT', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!p.ok) throw new Error('Scrittura fallita (' + p.status + '). Il token ha il permesso "Contents: Read and write"?');
     lset('token', $('token').value.trim()); lset('owner', $('owner').value.trim()); lset('repo', $('repo').value.trim());
-    st('Salvato! Attivo entro circa 1 minuto.', 'ok');
+    saved = snap(devices);
+    st('Salvato su GitHub ✓', 'ok');
+    showReport(changes);
   } catch (e) { st(e.message, 'err'); }
   $('save').disabled = false;
 };
