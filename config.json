@@ -3,8 +3,10 @@
     "1": {
       "name": "Bar Altanon",
       "url": "https://www.google.com/search?client=safari&hs=DakB&sca_esv=d596cda53f444369&channel=ipad_bm&biw=430&bih=721&sxsrf=AKL5yDiwX7a-6X98xD7HsVWb5JUsjAsscg:1795859043519&q=altanon+feltre&uds=AE2AFgbf06ZzDvczg9XBG5Z3qflX7GjWArmJhXZFYkaLURGt5SLl790ytkH6C7YMTYv3-KW7oa3KpkBSXQeAHtncaOghUW2M_N7CNQDdeRIa545dmeCcQAY&sa=X&ved=2ahUKEwj13euisKqYAxWbX0EAHfjjENYQkc0JKAB6BAgUEAE&ictx=1&stq=1&cs=0&lei=Y6IKa7WgH5u_hbIP-MfDsA0#sv=CAESzQEKuQEStgEKd0FERGJXZWI3OTBsWmJqekc5TjFobXltU3pWZ1BOVGdpUWJXdW5vQ2VmS3ZhQzR3RGZ2REFVSVlEOXZOTm5sRk92OUlpUEp5Z0tLTkJFckhMTW5LYktwLVNaZFc0U2pLUE1iNHg5Z0VlMm41WmVxaXNGd0g0ai1vEhdicUlLYTVLUkNkbXVoYklQb0l1YnlRWRoiQUhOMEU3RmJULTZZWkRvWkQ1LWRFYnB3TjVQdFNZOFF6QRIEODA1MRoBMyoAMAA4AUAAGAAgnKuogAlKAhAB",
-      "courtesy": false,
-      "color": "#1a73e8"
+      "courtesy": true,
+      "color": "#1a73e8",
+      "message": "Ci fa piacere sapere cosa pensi di noi. Lascia una recensione!",
+      "logo": "https://www.facebook.com/100071004033339/photos/-ricerca-personale-prossima-apertura-altanon-bistro-feltre-blper-la-nuova-apertu/112904341074037/"
     }
   }
 }
